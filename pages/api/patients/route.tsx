@@ -78,7 +78,7 @@ export default async function handlerWithRetry(req:NextApiRequest, res?:NextApiR
             //console.log("Missing Fields:", missing_fields);
 
             const missing_info = missing_fields.filter(field => field.message.includes('missing'));
-            /console.log("Missing Info:", missing_info);
+            //console.log("Missing Info:", missing_info);
 
             
 
