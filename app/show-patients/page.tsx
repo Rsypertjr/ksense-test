@@ -1,7 +1,7 @@
 // File: app/test-handler/page.tsx
 'use client';
 import { COOKIE_NAME_PRERENDER_DATA } from 'next/dist/server/api-utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 export type Patient = {
     patient_id:string,
@@ -48,6 +48,7 @@ export default function TestHandler(){
     const [ patientIndex, setPatientIndex] = useState(0);
     const [ patientNumber, setPatientNumber] = useState(1);
     const [ totalPatients, setTotalPatients] = useState(0);
+    const [ patients, setPatients] = useState([]);
     const [ pageNumber, setPageNumber ] = useState(1);
     const [ pageLimit, setPageLimit] = useState(10);
     const [totalPages, setTotalPages ] = useState(10);
@@ -66,74 +67,109 @@ export default function TestHandler(){
             const data = await res.json();
             console.log(data);
             setResponse(data);
+            setPatients(data.patients);
             setLoading(true);
-            setApiSuccess(data.success);
+            setApiSuccess(true);
             setPageNumber(data.pagination.page);
             setPageLimit(data.pagination.limit);
-            setTotalPages(data.pagination.totalPages);
-            setTotalPatients(data.pagination.totalPages*pageLimit);
-
-
+            setTotalPatients(data.pagination.total);
+          
         } catch (error) {
            
             setApiSuccess(false); 
+            console.log("Patients: ",patients);
            // setResponse({ error: (error as Error).message });
         }
     };
 
-    useEffect(() => {
-      
+    useEffect(() => {      
         console.log("Patient Index: ",patientIndex);
         const callGetHandler = async () => {
            await callHandler('GET');
            return;
-        }
-        callGetHandler();
+        };       
+        if(apiSuccess)
+            callGetHandler();
+    },[pageNumber,apiSuccess]);
 
-       
-    },[pageNumber])
+    useEffect(() => {        
+            console.log("Total Patients: ",totalPatients);
+    },[totalPatients]);
 
-    const handleNextPatient = () => {
-        const pIndex = patientIndex % pageLimit + 1;
-        setPatientNumber(((pageNumber-1)*pageLimit)+pIndex+1);
+     const handleNextPatient = useCallback(() => {
+                const pIndex = patientIndex % pageLimit + 1;
+                const patient_number = ((pageNumber-1)*pageLimit)+pIndex+1;
+                setPatientNumber(patient_number);
+                console.log("Patient Number: ", patient_number);
+                setPatientIndex(pIndex);
+                if(pIndex*pageNumber === (pageLimit*pageNumber))
+                {
+                    setPageNumber(pageNumber + 1);
+                    setLoading(false);
+                    setPatientIndex(0);
+                    console.log("loading is set to false",loading);
+                }
+            },[patientIndex]);
 
-        setPatientIndex(pIndex);
-        if(pIndex*pageNumber === (pageLimit*pageNumber))
-        {
-            setPageNumber(pageNumber + 1);
-            setLoading(false);
-            setPatientIndex(0);
+    const handlePreviousPatient = () => {
+        const pIndex = patientIndex % pageLimit;
+        const patient_number = ((pageNumber-1)*pageLimit)+pIndex;
+        console.log("Patient Number: ", patient_number);
+        const patients_lastPage = (pageNumber-1)*pageLimit;
+        setPatientNumber(patient_number);
+        setPatientIndex(pIndex-1);
+        if(patient_number === patients_lastPage)
+        {          
+            setPageNumber(pageNumber-1);
+            setPatientNumber(patient_number);
+            
+            setPatientIndex(9);
             console.log("loading is set to false",loading);
         }
     };
 
+    const handleRetry = () => {
+         setApiSuccess(true); 
+    };
+
     return (
         <>
-            <h1 className="mb-2 p-2 bg-gray-100  rounded-sm text-2xl text-center font-bold tracking-tight">Test Route Handlers for Patients</h1>
-            <div className="flex flex-row justify-between gap-x-2" role="group">
-                <button className="flex-1  py-2.5 px-5 me-2 mb-2 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700" type="button" onClick={() => callHandler('GET')}>GET</button>
-                <button className="flex-1 py-2.5 px-5 me-2 mb-2 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700" type="button" onClick={() => callHandler('POST')}>POST</button>
-                <button className="flex-1 py-2.5 px-5 me-2 mb-2 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700" type="button" onClick={() => callHandler('PUT')}>PUT</button>
-                <button className="flex-1 py-2.5 px-5 me-2 mb-2 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700" type="button" onClick={() => callHandler('DELETE')}>DELETE</button>
-            </div>
+            { true && 
+                <div>
+                    <h1 className="mb-2 p-2 bg-gray-100  rounded-sm text-2xl text-center font-bold tracking-tight">Patients Risk Scoring</h1>
+                </div>
+            }
+          
                 { !loading && apiSuccess &&
                     <div className="flex items-center justify-center">
                         <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
                     </div>
                 }
+
+                
                 { loading && apiSuccess &&
-                    <div className="flex flex-col items-center justify-center mb-5">
-                        <button type="button" 
-                            className="flex items-center justify-center h-10  mt-2  text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2" 
-                            onClick={handleNextPatient}>Next Patient
-                        </button>    
+                    <div className="flex items-center justify-center">
+                        { patientNumber > 1 &&
+                            <button type="button" 
+                                className="flex items-center justify-center h-10  mt-2  text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2" 
+                                onClick={handlePreviousPatient}>Previous Patient
+                            </button>   
+                        } 
+                        { patientNumber < totalPatients &&
+                             <button type="button" 
+                                className="flex items-center justify-center h-10  mt-2  text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2" 
+                                onClick={handleNextPatient}>Next Patient
+                            </button>  
+                        }
+                         
                     </div>
                 }
                 
+
                  {loading && apiSuccess &&
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                         {
-                            response.patients?.map((patient:Patient, index:number) => (
+                            patients?.map((patient:Patient, index:number) => (
                                 ( index === patientIndex &&
 
                                     <div key={patient?.patient_id} className="text-center bg-white border border-gray-500 p-3 rounded-md shadow-sm hover:bg-gray-100">
@@ -214,7 +250,11 @@ export default function TestHandler(){
                 }
                 { !apiSuccess &&
                                     <div className="text-center bg-white border border-gray-500 p-3 rounded-md shadow-sm hover:bg-gray-100">
-                                        <p className="font-normal text-left text-sm p-2 text-red-700 dark:text-red-400">{response.error}</p>      
+                                        <p className="font-normal text-left text-sm p-2 text-red-700 dark:text-red-400">{response.error}</p> 
+                                         <button type="button" 
+                                            className="flex items-center justify-center h-10  mt-2  text-white bg-red-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2" 
+                                            onClick={handleRetry}>Retry
+                                        </button>        
                                     </div>
 
 
