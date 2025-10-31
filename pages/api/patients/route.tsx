@@ -13,13 +13,14 @@ import { Patient } from "@/app/show-patients/page";
 function delayRetry(delay:number){
     return new Promise((resolve) => setTimeout(resolve, delay));
 }
-const page = 1;
-const limit = 10;
 let tries = 3;
 let retryMethod;
 export default async function handlerWithRetry(req:NextApiRequest, res?:NextApiResponse) {
     const {method} = req;
     retryMethod = method;
+
+    const limit = req.query.limit;
+    const page = req.query.page;
 
     switch (method) {
         case 'GET':
@@ -57,7 +58,7 @@ export default async function handlerWithRetry(req:NextApiRequest, res?:NextApiR
             //console.log("Patients:", patients.data);
 
             const missing_fields:Array<{message:string,key:string}> = [{message:'',key:''}];
-            patients.data.map((patient:Patient) => {
+            patients.data?.map((patient:Patient) => {
                 //const keys = Object.keys(patient);
                 const keys: Array<keyof Patient> = Object.keys(patient) as Array<keyof Patient>;
                 //console.log("keys:", keys);
@@ -83,7 +84,8 @@ export default async function handlerWithRetry(req:NextApiRequest, res?:NextApiR
             
 
            
-            res?.status(200).json({ message: 'Fetching patient data', patients:patients.data, missing_info:missing_info });
+            res?.status(200).json({ message: 'Fetching patient data', patients:patients.data, 
+                missing_info:missing_info,metadata:patients.metadata,pagination:patients.pagination });
             }catch (error: unknown){
                 if (error === 404) {
                     console.error("Rate limiting: May return 429 errors if you make requests too quickly. Consider caching data to prevent unnecessary repeated requests.");

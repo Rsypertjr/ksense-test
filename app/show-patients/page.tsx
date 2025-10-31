@@ -1,6 +1,7 @@
 // File: app/test-handler/page.tsx
 'use client';
-import { useState } from 'react';
+import { COOKIE_NAME_PRERENDER_DATA } from 'next/dist/server/api-utils';
+import { useEffect, useState } from 'react';
 
 export type Patient = {
     patient_id:string,
@@ -43,20 +44,20 @@ export default function TestHandler(){
     const [loading, setLoading ] = useState(false);
     const [ method, setMethod] = useState('');
     const [ postData, setPostData] = useState({});
+    const [ patientIndex, setPatientIndex] = useState(0)
+    const [ pageNumber, setPageNumber ] = useState(1);
+    const [ pageLimit, setPageLimit] = useState(10);
 
 
     const callHandler = async (method:string) => {
         setMethod(method);
         try {
-            const res = await fetch('/api/patients/route', {
+            const res = await fetch(`/api/patients/route?page=${pageNumber}&limit=${pageLimit}`, {
                 method, 
                 headers: {
                     'Content-Type': 'application/json'
 
-                },
-                ...(method === 'POST' || method === 'PUT' 
-                  ? { body: JSON.stringify(postData)}
-                  : {}),
+                }
             });
 
             
@@ -65,8 +66,26 @@ export default function TestHandler(){
             console.log(data);
             setResponse(data);
             setLoading(true);
+            setPageNumber(data.pagination.page);
+            setPageLimit(data.pagination.limit);
+
         } catch (error) {
             setResponse({ error: (error as Error).message });
+        }
+    };
+
+    useEffect(() => {
+        console.log("Patient Index: ",patientIndex);
+        callHandler('GET');
+    },[pageNumber])
+
+    const handleNextPatient = () => {
+        const pIndex = patientIndex % pageLimit + 1;
+
+        setPatientIndex(pIndex);
+        if(pIndex*pageNumber === (pageLimit*pageNumber))
+        {
+            setPageNumber(pageNumber + 1);
         }
     };
 
@@ -87,10 +106,12 @@ export default function TestHandler(){
                  {loading && method === 'GET' &&
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2" >
                         {
-                            response.patients?.map((patient:Patient) => (
+                            response.patients?.map((patient:Patient, index:number) => (
+                                ( index === patientIndex &&
+
                                 <div key={patient?.patient_id} 
                                     className="text-center bg-white border border-gray-500 p-3 rounded-md shadow-sm hover:bg-gray-100" 
-                                >
+                                 >
                                     <h2 className="p-1  bg-gray-300 text-1xl font-bold tracking-tight text-gray-900 dark:text-white">{patient.name}</h2>
                                     <p className="font-normal p-1 bg-blue-200 text-gray-700 dark:text-gray-400">{`Patient Id: ${patient.patient_id}`}</p>                                    
                                     <p className="font-normal p-1 bg-blue-200 text-gray-700 dark:text-gray-400">{`Patient Name: ${patient.name}`}</p>                                    
@@ -102,10 +123,16 @@ export default function TestHandler(){
                                     <p className="font-normal p-1 bg-blue-200 text-gray-700 dark:text-gray-400">{`Patient Diagnosis: ${patient.diagnosis}`}</p>                                    
                                     <p className="font-normal p-1 bg-blue-200 text-gray-700 dark:text-gray-400">{`Patient Medications: ${patient.medications}`}</p>
                                 </div>
+
+
+                                )
+                               
                             ))
                         }
                     </div>
                 }
+                <button type="button" className="mt-2 text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800" onClick={handleNextPatient}>Next Patient</button>
+    
         </>
         
     );
