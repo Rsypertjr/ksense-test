@@ -29,80 +29,120 @@ export default async function handlerWithRetry(req:NextApiRequest, res?:NextApiR
             const myHeaders = new Headers();
             myHeaders.append( 'x-api-key', process.env.API_KEY as string);
             try {
-            const getPatients = async () => {
-                const response = await fetch(`https://assessment.ksensetech.com/api/patients?page=${page}&limit=${limit}`,
-                    {
-                        method:'GET',
-                        headers: myHeaders
-                    }
-                );
+                    const getPatients = async () => {
+                        const response = await fetch(`https://assessment.ksensetech.com/api/patients?page=${page}&limit=${limit}`,
+                            {
+                                method:'GET',
+                                headers: myHeaders
+                            }
+                        );
 
-                if (!response.ok) {
-                    // Attempt to parse error details from the response body if it's JSON
-                    // If the response is not OK, it might still contain JSON with error details.
-                    // Attempt to parse it, but also handle cases where it's not valid JSON.
-                    try {
-                        const errorData = await response.json();
-                        throw new Error(`HTTP error! Status: ${response.status}, Details: ${JSON.stringify(errorData)}`);
-                    } catch (jsonError) {                        
-                        // If parsing the error body as JSON fails, throw a generic error.
-                        throw new Error(`HTTP error! Status: ${response.status}, Could not parse error details.`);
-                    }
-                }
-                return await response.json();
-             
-            }
+                        if (!response.ok) {
+                            // Attempt to parse error details from the response body if it's JSON
+                            // If the response is not OK, it might still contain JSON with error details.
+                            // Attempt to parse it, but also handle cases where it's not valid JSON.
+                            try {
+                                const errorData = await response.json();
+                                // Provide Http Error response for !response.ok
+                                return res?.status(405).json({
+                                    success: false,
+                                    error: `HTTP error! Status: ${response.status}, Details: ${JSON.stringify(errorData)}`
+                                });
 
-            // check for missing fields
-            const patients = await getPatients();
-            //console.log("Patients:", patients.data);
-
-            const missing_fields:Array<{message:string,key:string}> = [{message:'',key:''}];
-            patients.data?.map((patient:Patient) => {
-                //const keys = Object.keys(patient);
-                const keys: Array<keyof Patient> = Object.keys(patient) as Array<keyof Patient>;
-                //console.log("keys:", keys);
-                //console.log("Patient: ", patient);
-                
-                keys.forEach(key => {
-                        const value:any = patient[key];
-                        if(patient[key] === undefined || patient[key] === null ){
-                            missing_fields.push({message:`Patient ${patient.name} and Id: ${patient.patient_id} is missing field ${key}`, key:key});
+                            } catch (jsonError) { // Catch if specifically Json formatting error   
+                                return res?.status(400).json({
+                                    success: false,
+                                    error: `JSON Format Error! Status: ${response.status}, Could not parse as json.`
+                                });
+                                throw jsonError;
+                            }
                         }
-                        else{
-                            missing_fields.push({message:`Patient ${patient.name} and Id: ${patient.patient_id} has field ${key}`,key:key});
+                        // Return Fetched Response
+                        return await response.json();
+                    
+                    }
+
+                    // check for missing fields
+                    const patients = await getPatients();
+                    //console.log("Patients:", patients.data);
+
+                    if(patients.data?.length > 0) {
+                        const missing_fields:Array<{message:string,key:string}> = [{message:'',key:''}];
+                        patients.data?.map((patient:Patient) => {
+                            //const keys = Object.keys(patient);
+                            const keys: Array<keyof Patient> = Object.keys(patient) as Array<keyof Patient>;
+                            //console.log("keys:", keys);
+                            //console.log("Patient: ", patient);
+                            
+                            keys.forEach(key => {
+                                    const value:any = patient[key];
+                                    if(patient[key] === undefined || patient[key] === null ){
+                                        missing_fields.push({message:`Patient ${patient.name} and Id: ${patient.patient_id} is missing field ${key}`, key:key});
+                                    }
+                                    else{
+                                        missing_fields.push({message:`Patient ${patient.name} and Id: ${patient.patient_id} has field ${key}`,key:key});
+                                    }
+
+                                });
+                            });
+                            
+                        //console.log("Missing Fields:", missing_fields);
+
+                        const missing_info = missing_fields.filter(field => field.message.includes('missing'));
+                        //console.log("Missing Info:", missing_info);
+
+                        res?.status(200).json({ // Return API response and processed data
+                            success:true,
+                            message: 'Fetching patient data', 
+                            patients:patients.data,                                     
+                            missing_info:missing_info,
+                            metadata:patients.metadata,
+                            pagination:patients.pagination 
+                        });
+                    } else {  // data returned null, try getPatients again
+                           tries = 3;
+                           while(tries > 0) {
+                                tries--;
+                                if(tries === 0){  // Give Http response after tries exhausted
+                                    return res?.status(405).json({
+                                        success: false,
+                                        error: `Repeated tried to Retrieve Data with null results`
+                                    });
+                                }
+                                delayRetry(3000);
+                                handlerWithRetry({method: retryMethod} as NextApiRequest);
+                            }
                         }
-
-                    });
-                });
-                
-            //console.log("Missing Fields:", missing_fields);
-
-            const missing_info = missing_fields.filter(field => field.message.includes('missing'));
-            //console.log("Missing Info:", missing_info);
-
-            
-
            
-            res?.status(200).json({ message: 'Fetching patient data', patients:patients.data, 
-                missing_info:missing_info,metadata:patients.metadata,pagination:patients.pagination });
-            }catch (error: unknown){
+           
+         
+            }catch (error){
                 if (error === 404) {
-                    console.error("Rate limiting: May return 429 errors if you make requests too quickly. Consider caching data to prevent unnecessary repeated requests.");
+                    return res?.status(404).json({
+                        success: false,
+                        error: `Rate limiting: May return 429 errors if you make requests too quickly. Consider caching data to prevent unnecessary repeated requests`
+                    });
                    
                 } else if (error === 500 || error === 503) {
 
                         while(tries > 0) {
                             tries--;
                             if(tries === 0){
-                                throw new Error(`500 Internal Server Error and/or Non-availability: Request could not be fullfilled due to server configuration, maintenance, or other issue. This is not due to the client request. This may be temporary so try again later: ${error}`);
+                                return res?.status(500).json({ 
+                                    success: false,
+                                    error:`500 Internal Server Error and/or Non-availability: Request could not be fullfilled due to server configuration, maintenance, or other issue. This is not due to the client request. This may be temporary so try again later: ${error}`,
+                                });
                             }
                             delayRetry(3000);
                             handlerWithRetry({method: retryMethod} as NextApiRequest);
                         }
                 }
                 else {
-                    console.error("An unexpected error occurred:", error);
+                    console.error("API error:", error);
+                    return res?.status(405).json({
+                        success: false,
+                        error: `API error:, ${error}`
+                    });
                 } 
             }
             break;
