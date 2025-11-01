@@ -211,7 +211,7 @@ export default function TestHandler(){
                 setEvaluatedPatients((prevItems) => [...(prevItems || []), eval_patient]);
             } catch (error ) {
                 //console.error(`An error occurred:", ${(error as Error).message}`)
-                setBpInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(theEvalPatient)} `);
+                setBpInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(patient)} `);
 
                 // Record Data Quality Issues               
                 const checkAlready = dataQualityIssues?.filter((id) => {
@@ -281,7 +281,7 @@ export default function TestHandler(){
                setEvaluatedPatients(new_set);
             } catch (error ) {
                 //console.error(`An error occurred:", ${(error as Error).message}`)
-                setTpInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(theEvalPatient)} `);
+                setTpInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(patient)} `);
 
                 // Record Data Quality Issues               
                 const checkAlready = dataQualityIssues?.filter((id) => {
@@ -355,7 +355,7 @@ export default function TestHandler(){
                setEvaluatedPatients(new_set);
             } catch (error ) {
                 //console.error(`An error occurred:", ${(error as Error).message}`)
-                setAgeInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(theEvalPatient)} `);
+                setAgeInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(patient)} `);
 
                 // Record Data Quality Issues               
                 const checkAlready = dataQualityIssues?.filter((id) => {
