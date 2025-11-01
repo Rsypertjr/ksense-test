@@ -57,6 +57,8 @@ export default function TestHandler(){
     const [ method, setMethod] = useState('');
     const [ postData, setPostData] = useState({});
     const [ apiSuccess, setApiSuccess ] = useState(true);
+    const [ readyToSubmit, setReadyToSubmit] = useState(false);
+    const [ notYet, setNotYet ] = useState(false);
     const [ patientIndex, setPatientIndex] = useState(0);
     const [ patientNumber, setPatientNumber] = useState(1);
     const [ totalPatients, setTotalPatients] = useState(0);
@@ -65,14 +67,11 @@ export default function TestHandler(){
     const [ infoTpError, setTpInfoError] = useState('');
     
     const [ infoAgeError, setAgeInfoError] = useState('');
-    const [ systolic, setSystolic ] = useState(0);
-    const [ diastolic, setDiastolic ] = useState(0);
     const [ temperature, setTemperature ] = useState(0);
     const [ age, setAge ] = useState(0);
     const [ patients, setPatients] = useState([]);
     const [ pageNumber, setPageNumber ] = useState(1);
     const [ pageLimit, setPageLimit] = useState(10);
-    const [totalPages, setTotalPages ] = useState(10);
     const [ bloodPressureRisk, setBloodPressureRisk] = useState<null | number>(null);    
     const [ temperatureRisk, setTemperatureRisk] = useState<null | number>(null);
     const [ totalRisk, setTotalRisk] = useState<null | number>(null);
@@ -129,6 +128,18 @@ export default function TestHandler(){
 
     useEffect(() => {
         console.log("Evaluated Patients: ",evaluatedPatients);
+        const number_evaluated = evaluatedPatients?.length;
+        console.log("Number Evaluated: ",number_evaluated);
+
+        if((number_evaluated === totalPatients) && (patientNumber == totalPatients)){
+            console.log("High Risk Patients: ", highRiskPatients);
+            console.log("Fever Patients: ", feverPatients );
+            console.log("Data Quality Issues: ", dataQualityIssues);
+            setReadyToSubmit(true);
+            setNotYet(false);
+            
+
+        }
 
     },[evaluatedPatients])
 
@@ -136,6 +147,7 @@ export default function TestHandler(){
         console.log("High Risk Patients: ",highRiskPatients);
         console.log("Fever Patients: ",feverPatients);
         console.log("Data Quality Issues: ", dataQualityIssues);
+      
 
     },[highRiskPatients,feverPatients,dataQualityIssues])
 
@@ -147,7 +159,8 @@ export default function TestHandler(){
             const patient:Patient = patients[patientIndex as number];
             thePatient = patient;
             console.log("Current Patient: ", patient); 
-
+            
+          
             // Evaluate for Blood Pressure Risk
             try {
                 const pressure = patient.blood_pressure.split("/");
@@ -172,8 +185,6 @@ export default function TestHandler(){
                 // Set State variables
                 const systolic_number = Number(pressure[0]);
                 const diastolic_number = Number(pressure[1]);
-                setSystolic(systolic_number);
-                setDiastolic(diastolic_number);
 
                 let normalPoints = 0;
                 let elevatedPoints = 0;
@@ -207,18 +218,34 @@ export default function TestHandler(){
                     total_risk_score: 0
                 }
                 console.log("Evaluated Patient: ", eval_patient);
-                theEvalPatient = eval_patient;    
                 setEvaluatedPatients((prevItems) => [...(prevItems || []), eval_patient]);
             } catch (error ) {
                 //console.error(`An error occurred:", ${(error as Error).message}`)
                 setBpInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(patient)} `);
 
+
+                eval_patient = {
+                    patient_id: patient?.patient_id,
+                    name: patient?.name,
+                    age: patient?.age,
+                    gender: patient?.gender,
+                    blood_pressure: patient?.blood_pressure,
+                    temperature: patient?.temperature,
+                    visit_date: patient?.visit_date,
+                    diagnosis: patient?.diagnosis,
+                    medications: patient?.medications,
+                    blood_pressure_risk: 0,
+                    temperature_risk: 0,
+                    age_risk: 0,
+                    total_risk_score: 0
+                }
+                setEvaluatedPatients((prevItems) => [...(prevItems || []), eval_patient]); 
                 // Record Data Quality Issues               
                 const checkAlready = dataQualityIssues?.filter((id) => {
-                    return theEvalPatient.patient_id === id;
+                    return patient?.patient_id === id;
                 })
                 if(checkAlready?.length === 0)
-                    setDataQualityIssues((prevItems) => [...prevItems || [], theEvalPatient.patient_id]);           
+                    setDataQualityIssues((prevItems) => [...prevItems || [], patient?.patient_id]);           
             }
 
             // Evaluate for Temperature Risk
@@ -254,6 +281,8 @@ export default function TestHandler(){
                 let temperature_risk = normalPoints + lowFeverPoints + highFeverPoints;     
 
                 setTemperatureRisk(temperature_risk);
+
+                // Start updating evaluated patient without Errors
                 const partialUpdate: Partial<EvalPatient> = {                   
                     temperature_risk: temperature_risk,
                 }
@@ -276,19 +305,42 @@ export default function TestHandler(){
                 
 
                const new_set = [...non_evaluated as EvalPatient[], eval_patient]
-               theEvalPatient = eval_patient;
                console.log("New Set: ", new_set);
                setEvaluatedPatients(new_set);
             } catch (error ) {
                 //console.error(`An error occurred:", ${(error as Error).message}`)
                 setTpInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(patient)} `);
 
+                // Add Evaluated Patient with Temperature Risk = 0 because of Error
+                const partialUpdate: Partial<EvalPatient> = {                   
+                    temperature_risk: 0,
+                }
+                eval_patient = {...eval_patient, ...partialUpdate}
+
+                const non_evaluated = evaluatedPatients?.filter((patient) => {
+                    return patient.patient_id !== eval_patient.patient_id;
+                });
+               const new_set = [...non_evaluated as EvalPatient[], eval_patient]
+               console.log("New Set: ", new_set);
+               setEvaluatedPatients(new_set);
+
+
+                // Record High Temperature Even in Error
+                    const checkAlready = feverPatients?.filter((id) => {
+                        return eval_patient.patient_id === id;
+                    })
+                    if(checkAlready?.length === 0)
+                        if(Number(eval_patient.temperature) >= 99.6) {
+                            setFeverPatients((prevItems) => [...prevItems || [], eval_patient.patient_id]);                   
+                }
+
+
                 // Record Data Quality Issues               
-                const checkAlready = dataQualityIssues?.filter((id) => {
-                    return theEvalPatient.patient_id === id;
+                const checkAlreadyQ = dataQualityIssues?.filter((id) => {
+                    return patient?.patient_id === id;
                 })
-                if(checkAlready?.length === 0)
-                    setDataQualityIssues((prevItems) => [...prevItems || [], theEvalPatient.patient_id]);       
+                if(checkAlreadyQ?.length === 0)
+                    setDataQualityIssues((prevItems) => [...prevItems || [], patient?.patient_id]);       
             }
 
 
@@ -328,6 +380,7 @@ export default function TestHandler(){
 
                 setAgeRisk(age_risk);
 
+                // Add Evaluated Patient with newly calculated age risk and total risk score
                 const total_risk = (eval_patient.blood_pressure_risk as number) + (eval_patient.temperature_risk as number) + age_risk;
                 const partialUpdate: Partial<EvalPatient> = {                   
                     age_risk: age_risk,
@@ -349,20 +402,46 @@ export default function TestHandler(){
                     return patient.patient_id !== eval_patient.patient_id;
                 });
 
-               const new_set = [...non_evaluated as EvalPatient[], eval_patient]
-               theEvalPatient = eval_patient;
+               const new_set = [...non_evaluated as EvalPatient[], eval_patient];
                console.log("New Set: ", new_set);
                setEvaluatedPatients(new_set);
             } catch (error ) {
-                //console.error(`An error occurred:", ${(error as Error).message}`)
+                
                 setAgeInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(patient)} `);
+
+                // Calculate total risk with 0 age risk because of Error
+                // Also, evaluate Patient still in Error with no age risk
+                const total_risk = (eval_patient.blood_pressure_risk as number) + (eval_patient.temperature_risk as number) + 0;
+                const partialUpdate: Partial<EvalPatient> = {                   
+                    age_risk: 0,
+                    total_risk_score: total_risk
+                }
+                eval_patient = {...eval_patient, ...partialUpdate}
+                setTotalRisk(total_risk);
+
+                const non_evaluated = evaluatedPatients?.filter((patient) => {
+                    return patient.patient_id !== eval_patient.patient_id;
+                });
+
+               const new_set = [...non_evaluated as EvalPatient[], eval_patient];
+               console.log("New Set: ", new_set);
+               setEvaluatedPatients(new_set);
+
+                // Record High Risk even in Error and no age risk
+                if(total_risk >= 4) {
+                    const checkAlready = highRiskPatients?.filter((id) => {
+                        return eval_patient.patient_id === id;
+                    })
+                    if(checkAlready?.length === 0)
+                        setHighRiskPatients((prevItems) => [...prevItems || [], eval_patient.patient_id]);
+                }
 
                 // Record Data Quality Issues               
                 const checkAlready = dataQualityIssues?.filter((id) => {
-                    return theEvalPatient.patient_id === id;
+                    return patient?.patient_id === id;
                 })
                 if(checkAlready?.length === 0)
-                    setDataQualityIssues((prevItems) => [...prevItems || [], theEvalPatient.patient_id]);           
+                    setDataQualityIssues((prevItems) => [...prevItems || [], patient?.patient_id]);           
             }
         }
     },[patients, patientIndex])
@@ -412,13 +491,54 @@ export default function TestHandler(){
          setApiSuccess(true); 
     };
 
+    const handleAnswerSubmit = () => {
+            const results = {
+                high_risk_patients: highRiskPatients,
+                fever_patients: feverPatients,
+                data_quality_issues: dataQualityIssues,
+            };
+
+            fetch('https://assessment.ksensetech.com/api/submit-assessment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json', 
+                    'x-api-key': process.env.API_KEY as string
+                },
+                body: JSON.stringify(results)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Assessment Results:', data);
+            });
+
+    };
+
     return (
         <>
-            { true && 
-                <div>
-                    <h1 className="mb-2 p-2 bg-gray-100  rounded-sm text-2xl text-center font-bold tracking-tight">Patients Risk Scoring</h1>
-                </div>
-            }
+                { true && 
+                    <div>
+                        <h1 className="mb-2 p-2 bg-gray-100  rounded-sm text-2xl text-center font-bold tracking-tight">Patients Risk Scoring</h1>
+                    </div>
+                }
+
+                { readyToSubmit && !notYet &&
+                    <div className="text-center bg-white border border-gray-500 p-3 rounded-md shadow-sm hover:bg-gray-100">
+                        <p className="font-normal overflow-y-auto border-l border-r border-b border-gray-300 bg-gray-50 text-left text-sm p-6 text-blue-700 dark:text-gray-400">{`High Risk Patient (Ids): ${highRiskPatients}`}</p>
+                        <p className="font-normal overflow-y-auto border-l border-r border-b border-gray-300 bg-gray-50 text-left text-sm p-6 text-blue-700 dark:text-gray-400">{`Fever Patient (Ids): ${feverPatients}`}</p>
+                        <p className="font-normal overflow-y-auto border-l border-r border-b border-gray-300 bg-gray-50 text-left text-sm p-6 text-blue-700 dark:text-gray-400">{`Data Quality Issues (Ids): ${dataQualityIssues}`}</p>
+
+                        <div className="flex items-center justify-center">
+                            <button type="button" 
+                                className="flex items-center justify-center h-10  mt-5  text-white bg-blue-500 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2" 
+                                onClick={handleAnswerSubmit}>Ready to Submit?
+                            </button>  
+                            <button type="button" 
+                                className="flex items-center justify-center h-10  mt-5  text-white bg-red-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2" 
+                                onClick={() => setNotYet(true)}>Not Yet
+                            </button>  
+                        </div>      
+                    </div>
+                }
           
                 { !loading && apiSuccess &&
                     <div className="flex items-center justify-center">
@@ -435,7 +555,7 @@ export default function TestHandler(){
                                 onClick={handlePreviousPatient}>Previous Patient
                             </button>   
                         } 
-                        { patientNumber < totalPatients &&
+                        { patientNumber < (totalPatients) &&
                              <button type="button" 
                                 className="flex items-center justify-center h-10  mt-2  text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2" 
                                 onClick={handleNextPatient}>Next Patient
@@ -591,6 +711,7 @@ export default function TestHandler(){
 
 
                 }
+                
                 
                
         </>
