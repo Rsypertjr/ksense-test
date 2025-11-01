@@ -45,26 +45,44 @@ const res:responseType = {
     error: ''
 };
 
-
+let thePatient:Patient;
+let theEvalPatient:EvalPatient;
+let blood_pressure_risk:number;
+let temperature_risk:number;
+let eval_patient:EvalPatient;
 
 export default function TestHandler(){
     const [ response, setResponse ] = useState(res);
     const [loading, setLoading ] = useState(false);
     const [ method, setMethod] = useState('');
     const [ postData, setPostData] = useState({});
-    const [ apiSuccess, setApiSuccess ] = useState(false);
+    const [ apiSuccess, setApiSuccess ] = useState(true);
     const [ patientIndex, setPatientIndex] = useState(0);
     const [ patientNumber, setPatientNumber] = useState(1);
     const [ totalPatients, setTotalPatients] = useState(0);
-    const [ infoError, setInfoError] = useState('');
+    const [ infoBpError, setBpInfoError] = useState('');
+    
+    const [ infoTpError, setTpInfoError] = useState('');
+    
+    const [ infoAgeError, setAgeInfoError] = useState('');
     const [ systolic, setSystolic ] = useState(0);
     const [ diastolic, setDiastolic ] = useState(0);
+    const [ temperature, setTemperature ] = useState(0);
+    const [ age, setAge ] = useState(0);
     const [ patients, setPatients] = useState([]);
     const [ pageNumber, setPageNumber ] = useState(1);
     const [ pageLimit, setPageLimit] = useState(10);
     const [totalPages, setTotalPages ] = useState(10);
-    const [ bloodPressureRisk, setBloodPressureRisk] = useState<null | number>(null);
-    const [ evaluatedPatients, setEvaluatedPatients ] = useState<EvalPatient[]>([])
+    const [ bloodPressureRisk, setBloodPressureRisk] = useState<null | number>(null);    
+    const [ temperatureRisk, setTemperatureRisk] = useState<null | number>(null);
+    const [ totalRisk, setTotalRisk] = useState<null | number>(null);
+    const [ ageRisk, setAgeRisk] = useState<null | number>(null);
+    const [ evaluatedPatients, setEvaluatedPatients ] = useState<EvalPatient[] | undefined>([]);
+    const [ highRiskPatients, setHighRiskPatients ] = useState<string[] | undefined>([]);
+    const [ feverPatients, setFeverPatients ] = useState<string[] | undefined>([]);
+    const [ dataQualityIssues, setDataQualityIssues ] = useState<string[] | undefined>([]);
+    
+   
    
 
     const callHandler = async (method:string) => {
@@ -82,7 +100,7 @@ export default function TestHandler(){
             setResponse(data);
             setPatients(data.patients);
             setLoading(true);
-            setInfoError('');
+            setBpInfoError('');
             setApiSuccess(true);
             setPageNumber(data.pagination.page);
             setPageLimit(data.pagination.limit);
@@ -109,14 +127,28 @@ export default function TestHandler(){
         }
     },[pageNumber,apiSuccess]);
 
+    useEffect(() => {
+        console.log("Evaluated Patients: ",evaluatedPatients);
+
+    },[evaluatedPatients])
+
+     useEffect(() => {
+        console.log("High Risk Patients: ",highRiskPatients);
+        console.log("Fever Patients: ",feverPatients);
+        console.log("Data Quality Issues: ", dataQualityIssues);
+
+    },[highRiskPatients,feverPatients,dataQualityIssues])
+
     type pressureTypes = null | undefined | '';
 
     useEffect(() => {
-        let thePatient:Patient;
+       
         if(patients?.length > 0){
             const patient:Patient = patients[patientIndex as number];
-            thePatient= patient;
+            thePatient = patient;
             console.log("Current Patient: ", patient); 
+
+            // Evaluate for Blood Pressure Risk
             try {
                 const pressure = patient.blood_pressure.split("/");
                 if( pressure === undefined )  // Throw Error for no values
@@ -155,41 +187,183 @@ export default function TestHandler(){
                     stage1Points = 2;
                 else if(systolic_number >= 140 || diastolic_number >= 90)
                     stage2Points = 2;
-                const blood_pressure_risk = normalPoints + elevatedPoints + stage1Points + stage2Points;     
+                else;
+                let blood_pressure_risk = normalPoints + elevatedPoints + stage1Points + stage2Points;     
 
                 setBloodPressureRisk(blood_pressure_risk);
-                const eval_patient:EvalPatient = {
-                    patient_id: patient.patient_id,
-                    name: patient.name,
-                    age: patient.age,
-                    gender: patient.gender,
-                    blood_pressure: patient.blood_pressure,
-                    temperature: patient.temperature,
-                    visit_date: patient.visit_date,
-                    diagnosis: patient.diagnosis,
-                    medications: patient.medications,
+                eval_patient = {
+                    patient_id: thePatient.patient_id,
+                    name: thePatient.name,
+                    age: thePatient.age,
+                    gender: thePatient.gender,
+                    blood_pressure: thePatient.blood_pressure,
+                    temperature: thePatient.temperature,
+                    visit_date: thePatient.visit_date,
+                    diagnosis: thePatient.diagnosis,
+                    medications: thePatient.medications,
                     blood_pressure_risk: blood_pressure_risk,
                     temperature_risk: 0,
                     age_risk: 0,
-                    total_risk_score: blood_pressure_risk
+                    total_risk_score: 0
                 }
-               
-                setEvaluatedPatients(prevItems => [...prevItems, eval_patient]);
-
-
-
-
-
+                console.log("Evaluated Patient: ", eval_patient);
+                theEvalPatient = eval_patient;    
+                setEvaluatedPatients((prevItems) => [...(prevItems || []), eval_patient]);
             } catch (error ) {
                 //console.error(`An error occurred:", ${(error as Error).message}`)
-                setInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(thePatient)} `);
+                setBpInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(theEvalPatient)} `);
+
+                // Record Data Quality Issues               
+                const checkAlready = dataQualityIssues?.filter((id) => {
+                    return theEvalPatient.patient_id === id;
+                })
+                if(checkAlready?.length === 0)
+                    setDataQualityIssues((prevItems) => [...prevItems || [], theEvalPatient.patient_id]);           
+            }
+
+            // Evaluate for Temperature Risk
+            try {
+                const temperature = patient.temperature;
+                if( temperature === undefined )  // Throw Error for no values
+                    throw new TypeError(`Temperature Value is missing.`);
+
+                // Check values for null, undefined, or empty and throw Error
+                console.log("Temperature:", temperature);
+                if( temperature === null )
+                    throw new TypeError(`Temperature is null, undefined, or empty! ${JSON.stringify(temperature)}`);
+
+                // Check if values are convertible to Numbers and throw error
+                if(isNaN(Number(temperature)))
+                    throw new TypeError(`Temperature Input is not convertable to a number! ${JSON.stringify(temperature)}`);
+           
+                // Set State variables
+                const temperature_number = Number(temperature);
+                setTemperature(temperature_number);
+
+                let normalPoints = 0;
+                let lowFeverPoints = 0;
+                let highFeverPoints = 0;
+                let stage2Points = 0;
+                if(temperature_number <= 99.5)
+                    normalPoints = 0;
+                else if(temperature_number >= 99 && temperature_number <= 100.9)
+                    lowFeverPoints = 1;
+                else if(temperature_number >= 101.0)
+                    highFeverPoints = 2;
+                else;
+                let temperature_risk = normalPoints + lowFeverPoints + highFeverPoints;     
+
+                setTemperatureRisk(temperature_risk);
+                const partialUpdate: Partial<EvalPatient> = {                   
+                    temperature_risk: temperature_risk,
+                }
+                eval_patient = {...eval_patient, ...partialUpdate}
+
+               const non_evaluated = evaluatedPatients?.filter((patient) => {
+                  return patient.patient_id !== eval_patient.patient_id;
+
+               });
+
+                // Record High Temperature
+                    const checkAlready = feverPatients?.filter((id) => {
+                        return eval_patient.patient_id === id;
+                    })
+                    if(checkAlready?.length === 0)
+                        if(Number(eval_patient.temperature) >= 99.6) {
+                            setFeverPatients((prevItems) => [...prevItems || [], eval_patient.patient_id]);                   
+                }
+
+                
+
+               const new_set = [...non_evaluated as EvalPatient[], eval_patient]
+               theEvalPatient = eval_patient;
+               console.log("New Set: ", new_set);
+               setEvaluatedPatients(new_set);
+            } catch (error ) {
+                //console.error(`An error occurred:", ${(error as Error).message}`)
+                setTpInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(theEvalPatient)} `);
+
+                // Record Data Quality Issues               
+                const checkAlready = dataQualityIssues?.filter((id) => {
+                    return theEvalPatient.patient_id === id;
+                })
+                if(checkAlready?.length === 0)
+                    setDataQualityIssues((prevItems) => [...prevItems || [], theEvalPatient.patient_id]);       
             }
 
 
 
+            
+            // Evaluate for Age Risk
+            try {
+                const age = patient.age;
+                if( age === undefined )  // Throw Error for no values
+                    throw new TypeError(`Age Value is missing.`);
 
+                // Check values for null, undefined, or empty and throw Error
+                console.log("Age:", age);
+                if( temperature === null )
+                    throw new TypeError(`Age is null, undefined, or empty! ${JSON.stringify(age)}`);
 
+                // Check if values are convertible to Numbers and throw error
+                if(isNaN(Number(age)))
+                    throw new TypeError(`Age Input is not convertable to a number! ${JSON.stringify(age)}`);
+           
+                // Set State variables
+                const age_number = Number(age);
+                setAge(age_number);
 
+                let normalPoints = 0;
+                let lowRiskPoints = 0;
+                let highRiskPoints = 0;
+                let stage2Points = 0;
+                if(age_number < 40)
+                    normalPoints = 0;
+                else if(age_number >= 40 && age_number <= 65)
+                    lowRiskPoints = 1;
+                else if(age_number > 65)
+                    highRiskPoints = 2;
+                else;
+                let age_risk = normalPoints + lowRiskPoints + highRiskPoints;     
+
+                setAgeRisk(age_risk);
+
+                const total_risk = (eval_patient.blood_pressure_risk as number) + (eval_patient.temperature_risk as number) + age_risk;
+                const partialUpdate: Partial<EvalPatient> = {                   
+                    age_risk: age_risk,
+                    total_risk_score: total_risk
+                }
+                eval_patient = {...eval_patient, ...partialUpdate}
+                setTotalRisk(total_risk);
+
+                // Record High Risk
+                if(total_risk >= 4) {
+                    const checkAlready = highRiskPatients?.filter((id) => {
+                        return eval_patient.patient_id === id;
+                    })
+                    if(checkAlready?.length === 0)
+                        setHighRiskPatients((prevItems) => [...prevItems || [], eval_patient.patient_id]);
+                }
+
+                const non_evaluated = evaluatedPatients?.filter((patient) => {
+                    return patient.patient_id !== eval_patient.patient_id;
+                });
+
+               const new_set = [...non_evaluated as EvalPatient[], eval_patient]
+               theEvalPatient = eval_patient;
+               console.log("New Set: ", new_set);
+               setEvaluatedPatients(new_set);
+            } catch (error ) {
+                //console.error(`An error occurred:", ${(error as Error).message}`)
+                setAgeInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(theEvalPatient)} `);
+
+                // Record Data Quality Issues               
+                const checkAlready = dataQualityIssues?.filter((id) => {
+                    return theEvalPatient.patient_id === id;
+                })
+                if(checkAlready?.length === 0)
+                    setDataQualityIssues((prevItems) => [...prevItems || [], theEvalPatient.patient_id]);           
+            }
         }
     },[patients, patientIndex])
 
@@ -200,7 +374,9 @@ export default function TestHandler(){
                 const pIndex = patientIndex as number % pageLimit + 1;
                 const patient_number = ((pageNumber-1)*pageLimit)+pIndex+1;
                 setPatientNumber(patient_number);
-                setInfoError('');
+                setBpInfoError('');
+                setTpInfoError('');
+                setAgeInfoError('');
                 console.log("Patient Number: ", patient_number);
                 setPatientIndex(pIndex);
                 if(pIndex*pageNumber === (pageLimit*pageNumber))
@@ -218,7 +394,9 @@ export default function TestHandler(){
         console.log("Patient Number: ", patient_number);
         const patients_lastPage = (pageNumber-1)*pageLimit;
         setPatientNumber(patient_number);
-        setInfoError('');
+        setBpInfoError('');
+        setTpInfoError('');
+        setAgeInfoError('');
         setPatientIndex(pIndex-1);
         if(patient_number === patients_lastPage)
         {          
@@ -274,18 +452,26 @@ export default function TestHandler(){
                             patients?.map((patient:Patient, index:number) => (
                                 ( index === patientIndex as number &&
 
-                                    <div key={patient?.patient_id} className="text-center bg-white border border-gray-500 p-3 rounded-md shadow-sm hover:bg-gray-100">
-                                            <div className="text-center  bg-gray-300 text-lg font-bold mb-5">{`Patient ${patientNumber} of ${totalPatients}`}</div>
+                                    <div key={patient?.patient_id} className="text-center bg-blue-50 border border-gray-500 p-3 rounded-md shadow-sm hover:bg-gray-100">
+                                            <div className="text-center p-1 bg-gray-300 text-2xl font-bold mb-5">{`Patient ${patientNumber} of ${totalPatients}`}</div>
                                             <h2 className="p-1  bg-gray-300 text-1xl font-bold tracking-tight text-gray-900 dark:text-white">{patient.name}</h2>
-                                            <p className="font-normal p-1 bg-blue-200 text-gray-700 dark:text-gray-400">{`Patient Id: ${patient.patient_id}`}</p>                                    
-                                            <p className="font-normal p-1 bg-blue-200 text-gray-700 dark:text-gray-400">{`Patient Name: ${patient.name}`}</p>                                    
-                                            <p className="font-normal p-1 bg-blue-200 text-gray-700 dark:text-gray-400">{`Patient Age: ${patient.age}`}</p>                                    
-                                            <p className="font-normal p-1 bg-blue-200 text-gray-700 dark:text-gray-400">{`Patient Gender: ${patient.gender}`}</p>                                    
-                                            <p className="font-normal p-1 bg-blue-200 text-gray-700 dark:text-gray-400">{`Patient Blood Pressure: ${patient.blood_pressure}`}</p>                                    
-                                            <p className="font-normal p-1 bg-blue-200 text-gray-700 dark:text-gray-400">{`Patient Temperature: ${patient.temperature}`}</p>                                    
-                                            <p className="font-normal p-1 bg-blue-200 text-gray-700 dark:text-gray-400">{`Patient Visit Date: ${patient.visit_date}`}</p>                                    
-                                            <p className="font-normal p-1 bg-blue-200 text-gray-700 dark:text-gray-400">{`Patient Diagnosis: ${patient.diagnosis}`}</p>                                    
-                                            <p className="font-normal p-1 bg-blue-200 text-gray-700 dark:text-gray-400">{`Patient Medications: ${patient.medications}`}</p>
+                                            <p className="font-normal p-1 text-gray-700 dark:text-gray-400">{`Patient Id: ${patient.patient_id}`}</p>                                    
+                                            <p className="font-normal p-1 text-gray-700 dark:text-gray-400">{`Patient Name: ${patient.name}`}</p>                                    
+                                            <p className="font-normal p-1 text-gray-700 dark:text-gray-400">{`Patient Age: ${patient.age}`}</p>                                    
+                                            <p className="font-normal p-1 text-gray-700 dark:text-gray-400">{`Patient Gender: ${patient.gender}`}</p>                                    
+                                            <p className="font-normal p-1 text-gray-700 dark:text-gray-400">{`Patient Blood Pressure: ${patient.blood_pressure}`}</p>                                    
+                                            <p className="font-normal p-1 text-gray-700 dark:text-gray-400">{`Patient Temperature: ${patient.temperature}`}</p>                                    
+                                            <p className="font-normal p-1 text-gray-700 dark:text-gray-400">{`Patient Visit Date: ${patient.visit_date}`}</p>                                    
+                                            <p className="font-normal p-1 text-gray-700 dark:text-gray-400">{`Patient Diagnosis: ${patient.diagnosis}`}</p>                                    
+                                            <p className="font-normal p-1 text-gray-700 dark:text-gray-400">{`Patient Medications: ${patient.medications}`}</p>
+                                            { totalRisk !== null &&
+                                                <p className="font-normal text-center p-3  bg-gray-100 text-blue-500 border-t border-l border-r border-gray-300 dark:text-gray-400">{`The Total Risk for ( ${patient.name} ) is ${totalRisk}.`}</p>                                    
+                                                
+                                            }   
+                                            { totalRisk !== null && totalRisk >= 4 &&
+                                                <p className="font-normal text-center p-3 bg-gray-100  text-red-500 border-b border-l border-r border-gray-300 dark:text-gray-400">{`High Risk Patient ( ${patient.name} ) with Total Risk of ${totalRisk}.`}</p>                                    
+                                                
+                                            }      
                                     </div>
                                     
                                     
@@ -297,33 +483,30 @@ export default function TestHandler(){
                             response.patients?.map((patient:Patient, index:number) => (
                                 ( index === patientIndex &&
 
-                                    <div key={patient?.patient_id} className="text-center bg-gray-100 border border-gray-500 p-1 rounded-md shadow-sm hover:bg-gray-100">
+                                    <div key={patient?.patient_id} className="text-center bg-yellow-50 border border-gray-500 p-3 rounded-md shadow-sm hover:bg-gray-100">
                                             {/*<div className="text-center  bg-gray-300 text-lg font-bold mb-5">{`Patient ${patientNumber} of ${totalPatients}`}</div>*/}
-                                            <h2 className="p-1  bg-gray-300 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Blood Pressure Risk</h2>
+                                            <h2 className="p-1 bg-gray-300 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Blood Pressure Risk</h2>
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">Note: If systolic and diastolic readings fall into different risk categories, use the higher risk stage for scoring.</p>                                    
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`Normal (Systolic <120 AND Diastolic <80): ${0} points`}</p>                                    
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`Elevated (Systolic 120‑129 AND Diastolic <80): ${1} points`}</p>                                    
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`Stage 1 (Systolic 130‑139 OR Diastolic 80‑89): ${2} points`}</p>                                    
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`Stage 2 (Systolic ≥140 OR Diastolic ≥90): ${3} points`}</p> 
                                             { bloodPressureRisk !== null &&
-                                                <p className="font-normal text-left p-2 text-blue-500 border-t border-gray-300 dark:text-gray-400">{`The Blood Pressure Risk for ${patient.name} is ${bloodPressureRisk}.`}</p>                                    
+                                                <p className="font-normal text-left p-2 bg-gray-50 text-blue-500 border border-gray-300 dark:text-gray-400">{`The Blood Pressure Risk for ${patient.name} is ${bloodPressureRisk}.`}</p>                                    
                                                 
                                             }   
-                                             { bloodPressureRisk !== null && bloodPressureRisk >= 4 &&
-                                                <p className="font-normal text-left p-2 text-blue-500 border-t border-gray-300 dark:text-gray-400">{`The Blood Pressure Risk for ${patient.name} is ${bloodPressureRisk}.`}</p>                                    
-                                                
-                                            }                                      
-                                            <p className="font-normal text-left p-2 text-red-500 border-t border-gray-300 dark:text-gray-400">{`Invalid/Missing Data (0 points):`}</p>  
+                                                                                
+                                            <p className="font-normal text-left p-2 text-red-500 mt-2 bg-gray-50 border-gray-300 border-t border-r border-l  dark:text-gray-400">{`Invalid/Missing Data (0 points):`}</p>  
                                            
-                                            { infoError === '' &&
+                                            { infoBpError === '' &&
                                             <div>
-                                                <p className="font-normal text-left text-sm p-2 text-gray-700 dark:text-gray-400">{`• Missing systolic or diastolic values ${'(e.g., "150/" or "/90")'}`}</p>                                    
-                                                <p className="font-normal text-left text-sm p-2 text-gray-700 dark:text-gray-400">{`• Non-numeric values ${'(e.g., "INVALID", "N/A")'}`}</p>                                    
-                                                <p className="font-normal text-left text-sm p-2 text-gray-700 dark:text-gray-400">{`• Null, undefined, or empty values`}</p>  
+                                                <p className="font-normal text-left text-sm p-2 border-l border-r bg-gray-50  border-gray-300  text-gray-700 dark:text-gray-400">{`• Missing systolic or diastolic values ${'(e.g., "150/" or "/90")'}`}</p>                                    
+                                                <p className="font-normal text-left text-sm p-2 border-l border-r  bg-gray-50 border-gray-300  text-gray-700 dark:text-gray-400">{`• Non-numeric values ${'(e.g., "INVALID", "N/A")'}`}</p>                                    
+                                                <p className="font-normal text-left text-sm p-2 border-l border-b border-r bg-gray-50  border-gray-300  text-gray-700 dark:text-gray-400">{`• Null, undefined, or empty values`}</p>  
                                             </div>
                                             }
-                                            { infoError !== '' &&
-                                                <p className="font-normal overflow-y-auto  text-left text-sm p-6 text-red-500 dark:text-gray-400">{infoError}</p>
+                                            { infoBpError !== '' &&
+                                                <p className="font-normal overflow-y-auto border-l border-r border-b border-gray-300 bg-gray-50 text-left text-sm p-6 text-red-500 dark:text-gray-400">{infoBpError}</p>
                                             }                                  
                                           
                                     </div>
@@ -334,15 +517,31 @@ export default function TestHandler(){
                             response.patients?.map((patient:Patient, index:number) => (
                                 ( index === patientIndex &&
 
-                                    <div key={patient?.patient_id} className="text-center bg-white border border-gray-500 p-3 rounded-md shadow-sm hover:bg-gray-100">
+                                    <div key={patient?.patient_id} className="text-center bg-green-50 border border-gray-500 p-3 rounded-md shadow-sm hover:bg-gray-100">
                                             {/*<div className="text-center  bg-gray-300 text-lg font-bold mb-5">{`Patient ${patientNumber} of ${totalPatients}`}</div>*/}
                                             <h2 className="p-1  bg-gray-300 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Temperature Risk</h2>
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`Normal (≤99.5°F): ${0} points`}</p>                                    
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`Low Fever (99.6-100.9°F): ${1} points`}</p>                                    
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`High Fever (≥‮0.101‬°F): ${2} points`}</p>                                        
-                                            <p className="font-normal text-left p-2 text-red-500 border-t border-gray-300 dark:text-gray-400">{`Invalid/Missing Data (0 points):`}</p>                                    
-                                            <p className="font-normal text-left text-sm p-2 text-gray-700 dark:text-gray-400">{`• Non-numeric values ${'(e.g., "TEMP_ERROR", "invalid")'}`}</p>                                    
-                                            <p className="font-normal text-left text-sm p-2 text-gray-700 dark:text-gray-400">{`• Null, undefined, or empty values`}</p>       
+                                            { temperatureRisk !== null &&
+                                                <p className="font-normal text-left p-2  bg-gray-50  text-blue-500 border border-gray-300 dark:text-gray-400">{`The Temperature Risk for ${patient.name} is ${temperatureRisk}.`}</p>                                    
+                                                
+                                            }    
+                                            { Number(patient?.temperature) >= 99.6 &&
+                                                <p className="font-normal text-left p-3 bg-gray-50  text-red-500 border-b border-l border-r border-gray-300 dark:text-gray-400">{`The Patient ( ${patient.name} ) has High Fever with Temperature of ${patient.temperature}.`}</p>                                    
+                                                
+                                            }      
+                                            <p className="font-normal text-left p-3 bg-gray-50 mt-5 text-red-500 border-t border-r border-l border-gray-300 dark:text-gray-400">{`Invalid/Missing Data (0 points):`}</p>                                    
+                                           
+                                            { infoTpError === '' &&
+                                                <div>
+                                                    <p className="font-normal text-left border-l border-r border-gray-300 bg-gray-50 text-sm p-2 text-gray-700 dark:text-gray-400">{`• Non-numeric values ${'(e.g., "TEMP_ERROR", "invalid")'}`}</p>                                    
+                                                    <p className="font-normal text-left border-b border-l border-r border-gray-300  bg-gray-50 text-sm p-2 text-gray-700 dark:text-gray-400">{`• Null, undefined, or empty values`}</p>    
+                                                </div>
+                                            }
+                                            { infoTpError !== '' &&
+                                                <p className="font-normal overflow-y-auto bg-gray-50 text-left text-sm p-6 text-red-500 dark:text-gray-400">{infoTpError}</p>
+                                            }                  
                                     </div>   
                                 )
                             ))
@@ -351,15 +550,30 @@ export default function TestHandler(){
                             response.patients?.map((patient:Patient, index:number) => (
                                 ( index === patientIndex &&
 
-                                    <div key={patient?.patient_id} className="text-center bg-white border border-gray-500 p-3 rounded-md shadow-sm hover:bg-gray-100">
+                                    <div key={patient?.patient_id} className="text-center bg-fuchsia-100 border border-gray-500 p-3 rounded-md shadow-sm hover:bg-fuchsia-200">
                                             {/*<div className="text-center  bg-gray-300 text-lg font-bold mb-5">{`Patient ${patientNumber} of ${totalPatients}`}</div>*/}
                                             <h2 className="p-1  bg-gray-300 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Age Risk</h2>
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`Under 40 (<40 years): 1 points ${0} points`}</p>                                    
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`40-65 (40-65 years, inclusive): ${1} points`}</p>                                    
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`Over 65 (>65 years): ${2} points`}</p>                                        
-                                            <p className="font-normal text-left p-2 text-red-500 border-t border-gray-300 dark:text-gray-400">{`Invalid/Missing Data (0 points):`}</p>
-                                            <p className="font-normal text-left text-sm p-2 text-gray-700 dark:text-gray-400">{`• Null, undefined, or empty values`}</p> 
-                                            <p className="font-normal text-left text-sm p-2 text-gray-700 dark:text-gray-400">{`• Non-numeric strings (e.g., "fifty-three", "unknown")`}</p>      
+                                            
+                                            { ageRisk !== null &&
+                                                <p className="font-normal text-left p-2 text-blue-500 border bg-gray-100 border-gray-300 dark:text-gray-400">{`The Age Risk for ${patient.name} is ${ageRisk}.`}</p>                                    
+                                                
+                                            }   
+                                         
+                                            <p className="font-normal text-left p-2 text-red-500 border-t mt-2 bg-gray-50 border-gray-300 dark:text-gray-400">{`Invalid/Missing Data (0 points):`}</p>
+                                            { infoAgeError === '' &&
+                                                <div>
+                                                    <p className="font-normal text-left text-sm p-2 bg-gray-50  text-gray-700 dark:text-gray-400">{`• Null, undefined, or empty values`}</p> 
+                                                    <p className="font-normal text-left text-sm p-2  bg-gray-50 text-gray-700 dark:text-gray-400">{`• Non-numeric strings (e.g., "fifty-three", "unknown")`}</p>      
+                                                 </div>
+                                            }
+                                            { infoAgeError !== '' &&
+                                                <p className="font-normal overflow-y-auto  bg-gray-50  text-left text-sm p-6 text-red-500 dark:text-gray-400">{infoAgeError}</p>
+                                            }            
+                                   
+                                   
                                     </div>
                                 )
                             ))
