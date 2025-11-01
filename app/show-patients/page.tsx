@@ -128,7 +128,7 @@ export default function TestHandler(){
 
     useEffect(() => {
         console.log("Evaluated Patients: ",evaluatedPatients);
-        const number_evaluated = evaluatedPatients?.length;
+        let number_evaluated = evaluatedPatients?.length;
         console.log("Number Evaluated: ",number_evaluated);
 
         if((number_evaluated === totalPatients) && (patientNumber == totalPatients)){
@@ -567,7 +567,7 @@ export default function TestHandler(){
                 
 
                  {loading && apiSuccess &&
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-2 p-3">
                         {
                             patients?.map((patient:Patient, index:number) => (
                                 ( index === patientIndex as number &&
