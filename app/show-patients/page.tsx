@@ -574,7 +574,7 @@ export default function TestHandler(){
 
                                     <div key={patient?.patient_id} className="text-center bg-blue-50 border border-gray-500 p-3 rounded-md shadow-sm hover:bg-gray-100">
                                             <div className="text-center p-1 bg-gray-300 text-2xl font-bold mb-5">{`Patient ${patientNumber} of ${totalPatients}`}</div>
-                                            <h2 className="p-1  bg-gray-300 text-1xl font-bold tracking-tight text-gray-900 dark:text-white">{patient.name}</h2>
+                                            <h2 className="p-1  bg-gray-300 text-1xl font-bold tracking-tight text-gray-900 dark:text-white">{`Patient Name: ( ${patient.name} )`}</h2>
                                             <p className="font-normal p-1 text-gray-700 dark:text-gray-400">{`Patient Id: ${patient.patient_id}`}</p>                                    
                                             <p className="font-normal p-1 text-gray-700 dark:text-gray-400">{`Patient Name: ${patient.name}`}</p>                                    
                                             <p className="font-normal p-1 text-gray-700 dark:text-gray-400">{`Patient Age: ${patient.age}`}</p>                                    
@@ -585,7 +585,7 @@ export default function TestHandler(){
                                             <p className="font-normal p-1 text-gray-700 dark:text-gray-400">{`Patient Diagnosis: ${patient.diagnosis}`}</p>                                    
                                             <p className="font-normal p-1 text-gray-700 dark:text-gray-400">{`Patient Medications: ${patient.medications}`}</p>
                                             { totalRisk !== null &&
-                                                <p className="font-normal text-center p-3  bg-gray-100 text-blue-500 border-t border-l border-r border-gray-300 dark:text-gray-400">{`The Total Risk for ( ${patient.name} ) is ${totalRisk}.`}</p>                                    
+                                                <p className="font-normal text-center p-3  bg-gray-100 text-blue-500 border-t border-l border-r border-gray-300 dark:text-gray-400">{`The Total Risk for patient: ( ${patient.name} ) is ${totalRisk}.`}</p>                                    
                                                 
                                             }   
                                             { totalRisk !== null && totalRisk >= 4 &&
@@ -612,7 +612,7 @@ export default function TestHandler(){
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`Stage 1 (Systolic 130‑139 OR Diastolic 80‑89): ${2} points`}</p>                                    
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`Stage 2 (Systolic ≥140 OR Diastolic ≥90): ${3} points`}</p> 
                                             { bloodPressureRisk !== null &&
-                                                <p className="font-normal text-left p-2 bg-gray-50 text-blue-500 border border-gray-300 dark:text-gray-400">{`The Blood Pressure Risk for ${patient.name} is ${bloodPressureRisk}.`}</p>                                    
+                                                <p className="font-normal text-left p-2 bg-gray-50 text-blue-500 border border-gray-300 dark:text-gray-400">{`The Blood Pressure Risk for patient: ( ${patient.name} ) is ${bloodPressureRisk}.`}</p>                                    
                                                 
                                             }   
                                                                                 
@@ -644,7 +644,7 @@ export default function TestHandler(){
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`Low Fever (99.6-100.9°F): ${1} points`}</p>                                    
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`High Fever (≥‮0.101‬°F): ${2} points`}</p>                                        
                                             { temperatureRisk !== null &&
-                                                <p className="font-normal text-left p-2  bg-gray-50  text-blue-500 border border-gray-300 dark:text-gray-400">{`The Temperature Risk for ${patient.name} is ${temperatureRisk}.`}</p>                                    
+                                                <p className="font-normal text-left p-2  bg-gray-50  text-blue-500 border border-gray-300 dark:text-gray-400">{`The Temperature Risk for patient: ( ${patient.name} ) is ${temperatureRisk}.`}</p>                                    
                                                 
                                             }    
                                             { Number(patient?.temperature) >= 99.6 &&
@@ -678,7 +678,7 @@ export default function TestHandler(){
                                             <p className="font-normal text-left p-2 text-gray-700 dark:text-gray-400">{`Over 65 (>65 years): ${2} points`}</p>                                        
                                             
                                             { ageRisk !== null &&
-                                                <p className="font-normal text-left p-2 text-blue-500 border bg-gray-100 border-gray-300 dark:text-gray-400">{`The Age Risk for ${patient.name} is ${ageRisk}.`}</p>                                    
+                                                <p className="font-normal text-left p-2 text-blue-500 border bg-gray-100 border-gray-300 dark:text-gray-400">{`The Age Risk for patient: ( ${patient.name} ) is ${ageRisk}.`}</p>                                    
                                                 
                                             }   
                                          
