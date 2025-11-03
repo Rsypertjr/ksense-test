@@ -98,6 +98,7 @@ export default function TestHandler(){
             console.log(data);
             setResponse(data);
             setPatients(data.patients);
+            console.log("Patients: ",data.patients);
             setLoading(true);
             setBpInfoError('');
             setApiSuccess(true);
@@ -222,7 +223,8 @@ export default function TestHandler(){
             } catch (error ) {
                 //console.error(`An error occurred:", ${(error as Error).message}`)
                 setBpInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(patient)} `);
-
+                
+               
 
                 eval_patient = {
                     patient_id: patient?.patient_id,
@@ -368,7 +370,6 @@ export default function TestHandler(){
                 let normalPoints = 0;
                 let lowRiskPoints = 0;
                 let highRiskPoints = 0;
-                let stage2Points = 0;
                 if(age_number < 40)
                     normalPoints = 0;
                 else if(age_number >= 40 && age_number <= 65)
@@ -498,12 +499,12 @@ export default function TestHandler(){
                 data_quality_issues: dataQualityIssues,
             };
 
+            const myHeaders = new Headers();
+            myHeaders.append( 'x-api-key', 'ak_7c5d74fec2fbaf147fdf94136014f48c4406807dadcb8bce');
+            myHeaders.append( 'Content-Type', 'application/json' );
             fetch('https://assessment.ksensetech.com/api/submit-assessment', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json', 
-                    'x-api-key': process.env.API_KEY as string
-                },
+                headers: myHeaders,
                 body: JSON.stringify(results)
             })
             .then(response => response.json())
