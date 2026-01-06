@@ -109,8 +109,8 @@ export default function TestHandler(){
             setLoading(true);
             setDataError(true);
             console.log(`Error in loading Data: ${error}`);
-           // console.log("Patients: ",patients);
-           // setResponse({ error: (error as Error).message });
+            // console.log("Patients: ",patients);
+            //setResponse({ error: (error as Error).message });
         }
     },[pageLimit,pageNumber]);
 
@@ -270,13 +270,6 @@ export default function TestHandler(){
                 }
                 eval_patient = {...eval_patient, ...partialUpdate}
 
-              
-
-               const non_evaluated = evaluatedPatients?.filter((patient) => {
-                  return patient.patient_id !== eval_patient.patient_id;
-
-               });
-
                 // Record High Temperature
                     const checkAlready = feverPatients?.filter((id) => {
                         return eval_patient.patient_id === id;
@@ -286,10 +279,7 @@ export default function TestHandler(){
                             setFeverPatients((prevItems) => [...prevItems || [], eval_patient.patient_id]);                   
                 }
 
-                
-
-               const new_set = [...non_evaluated as EvalPatient[], eval_patient]
-               console.log("New Set: ", new_set);
+             
               // setEvaluatedPatients(new_set);
             } catch (error ) {
                 //console.error(`An error occurred:", ${(error as Error).message}`)
@@ -301,11 +291,6 @@ export default function TestHandler(){
                 }
                 eval_patient = {...eval_patient, ...partialUpdate}
 
-                const non_evaluated = evaluatedPatients?.filter((patient) => {
-                    return patient.patient_id !== eval_patient.patient_id;
-                });
-               const new_set = [...non_evaluated as EvalPatient[], eval_patient]
-               console.log("New Set: ", new_set);
                 // Record High Temperature Even in Error
                     const checkAlready = feverPatients?.filter((id) => {
                         return eval_patient.patient_id === id;
@@ -359,35 +344,37 @@ export default function TestHandler(){
 
                 setAgeRisk(age_risk);
 
-                // Add Evaluated Patient with newly calculated age risk and total risk score
+                // Calculate the Total Risk of Patient
                 const total_risk = (eval_patient.blood_pressure_risk as number) + (eval_patient.temperature_risk as number) + age_risk;
+
+                // Add Values to some Properties of Evaluated Patient using Partial
                 const partialUpdate: Partial<EvalPatient> = {                   
                     age_risk: age_risk,
                     total_risk_score: total_risk
                 }
+                // Combine additional properties to Eval_Patient Object from the partial Update using Spread Operator
                 eval_patient = {...eval_patient, ...partialUpdate}
+
                 setTotalRisk(total_risk);
 
                 // Record High Risk
                 if(total_risk >= 4) {
+                    // Check for Duplicate
                     const checkAlready = highRiskPatients?.filter((id) => {
                         return eval_patient.patient_id === id;
                     })
+                    // Update State by combining Spread of Previous Item Id's with new Evaluated Patient Id (in an Array)
                     if(checkAlready?.length === 0)
                         setHighRiskPatients((prevItems) => [...prevItems || [], eval_patient.patient_id]);
                 }
 
-                const non_evaluated = evaluatedPatients?.filter((patient) => {
-                    return patient.patient_id !== eval_patient.patient_id;
-                });
-
-               const new_set = [...non_evaluated as EvalPatient[], eval_patient];
-               console.log("New Set: ", new_set);
-
-               // Set Evaluated Patients
+               // Update Evaluated Patients after blood pressure, temperature, and age assessments                
                const enLength = evaluatedPatients?.length || 0;
+
                if(patientNumber < totalPatients && (enLength <= patientNumber))
                     setEvaluatedPatients((prevItems) => [...(prevItems || []), eval_patient]);
+
+
             } catch (error ) {
                 
                 setAgeInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(patient)} `);
@@ -402,14 +389,7 @@ export default function TestHandler(){
                 eval_patient = {...eval_patient, ...partialUpdate}
                 setTotalRisk(total_risk);
 
-                const non_evaluated = evaluatedPatients?.filter((patient) => {
-                    return patient.patient_id !== eval_patient.patient_id;
-                });
-
-               const new_set = [...non_evaluated as EvalPatient[], eval_patient];
-               console.log("New Set: ", new_set);
-              // setEvaluatedPatients(new_set);
-
+        
                 // Record High Risk even in Error and no age risk
                 if(total_risk >= 4) {
                     const checkAlready = highRiskPatients?.filter((id) => {
@@ -448,7 +428,7 @@ export default function TestHandler(){
                 if(pIndex*pageNumber === (pageLimit*pageNumber))
                 {
                     setPageNumber(pageNumber + 1);
-                    setLoading(true);
+                    setLoading(false);
                     setApiSuccess(false);
                     setPatientIndex(0);
                     //console.log("loading is set to false",loading);
@@ -469,7 +449,7 @@ export default function TestHandler(){
         {          
             setPageNumber(pageNumber-1);
             setApiSuccess(false);
-            setLoading(true);
+            setLoading(false);
             setPatientNumber(patient_number);
             
             setPatientIndex(9);
