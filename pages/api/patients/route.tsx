@@ -17,7 +17,7 @@ function delayRetry(delay:number){
 }
 
 
-let tries = 3;
+const tries = 3;
 let retryMethod:string = '';
 export default async function handlerWithRetry(req:NextApiRequest, res?:NextApiResponse) {
     const {method} = req;
