@@ -1,7 +1,5 @@
 // File: app/test-handler/page.tsx
 'use client';
-import { minify } from 'next/dist/build/swc/generated-native';
-import { COOKIE_NAME_PRERENDER_DATA } from 'next/dist/server/api-utils';
 import { useEffect, useState, useCallback } from 'react';
 
 export type Patient = {
@@ -46,20 +44,20 @@ const res:responseType = {
 };
 
 let thePatient:Patient;
-let theEvalPatient:EvalPatient;
-let blood_pressure_risk:number;
-let temperature_risk:number;
+//let theEvalPatient:EvalPatient;
+//let blood_pressure_risk:number;
+//let temperature_risk:number;
 let eval_patient:EvalPatient;
 
 export default function TestHandler(){
     const [ response, setResponse ] = useState(res);
-    const [loading, setLoading ] = useState(false);
-    const [ method, setMethod] = useState('');
-    const [ postData, setPostData] = useState({});
-    const [ apiSuccess, setApiSuccess ] = useState(true);
+    const [loading, setLoading ] = useState(true);
+    const [dataError, setDataError] = useState(false);
+    const [ apiSuccess, setApiSuccess ] = useState(false);
     const [ readyToSubmit, setReadyToSubmit] = useState(false);
     const [ notYet, setNotYet ] = useState(false);
     const [ patientIndex, setPatientIndex] = useState(0);
+    const [ lastIndex, setLastIndex] = useState(0);
     const [ patientNumber, setPatientNumber] = useState(1);
     const [ totalPatients, setTotalPatients] = useState(0);
     const [ infoBpError, setBpInfoError] = useState('');
@@ -68,7 +66,6 @@ export default function TestHandler(){
     
     const [ infoAgeError, setAgeInfoError] = useState('');
     const [ temperature, setTemperature ] = useState(0);
-    const [ age, setAge ] = useState(0);
     const [ patients, setPatients] = useState([]);
     const [ pageNumber, setPageNumber ] = useState(1);
     const [ pageLimit, setPageLimit] = useState(10);
@@ -84,8 +81,7 @@ export default function TestHandler(){
    
    
 
-    const callHandler = async (method:string) => {
-        setMethod(method);
+    const callHandler = useCallback(async (method:string) => {
         try {
             const res = await fetch(`/api/patients/route?page=${pageNumber}&limit=${pageLimit}`, {
                 method, 
@@ -99,9 +95,10 @@ export default function TestHandler(){
             setResponse(data);
             setPatients(data.patients);
             console.log("Patients: ",data.patients);
-            setLoading(true);
+            setLoading(false);
             setBpInfoError('');
             setApiSuccess(true);
+            setDataError(false);
             setPageNumber(data.pagination.page);
             setPageLimit(data.pagination.limit);
             setTotalPatients(data.pagination.total);
@@ -109,54 +106,37 @@ export default function TestHandler(){
         } catch (error) {
            
             setApiSuccess(false); 
-            console.log("Patients: ",patients);
+            setLoading(true);
+            setDataError(true);
+            console.log(`Error in loading Data: ${error}`);
+           // console.log("Patients: ",patients);
            // setResponse({ error: (error as Error).message });
         }
-    };
+    },[pageLimit,pageNumber]);
 
-    useEffect(() => {      
-        console.log("Patient Index: ",patientIndex);
-        console.log('Evaluated Patients:',evaluatedPatients );
-        const callGetHandler = async () => {
-           await callHandler('GET');
-           return;
-        };       
-        if(apiSuccess){            
-            callGetHandler();
-           
+    useEffect(() => {    
+        if(!apiSuccess){            
+            callHandler('GET');           
         }
-    },[pageNumber,apiSuccess]);
+    },[pageNumber,apiSuccess,callHandler]);
 
-    useEffect(() => {
-        console.log("Evaluated Patients: ",evaluatedPatients);
-        let number_evaluated = evaluatedPatients?.length;
-        console.log("Number Evaluated: ",number_evaluated);
 
-        if((number_evaluated === totalPatients) && (patientNumber == totalPatients)){
-            console.log("High Risk Patients: ", highRiskPatients);
-            console.log("Fever Patients: ", feverPatients );
-            console.log("Data Quality Issues: ", dataQualityIssues);
-            setReadyToSubmit(true);
-            setNotYet(false);
-            
-
-        }
-
-    },[evaluatedPatients])
-
-     useEffect(() => {
-        console.log("High Risk Patients: ",highRiskPatients);
-        console.log("Fever Patients: ",feverPatients);
-        console.log("Data Quality Issues: ", dataQualityIssues);
-      
-
-    },[highRiskPatients,feverPatients,dataQualityIssues])
-
-    type pressureTypes = null | undefined | '';
-
+    // Finished with All Patients
     useEffect(() => {
        
-        if(patients?.length > 0){
+        if(patientNumber === totalPatients){
+            setNotYet(false);
+            setReadyToSubmit(true);
+        }
+
+    },[evaluatedPatients, totalPatients, patientNumber]);
+
+   
+    useEffect(() => {
+        console.log("Last Index:", lastIndex);
+        console.log("Patient Index", patientIndex);
+        if(patients?.length > 0 && (patientIndex > lastIndex)){
+            setLastIndex(patientIndex);
             const patient:Patient = patients[patientIndex as number];
             thePatient = patient;
             console.log("Current Patient: ", patient); 
@@ -200,7 +180,7 @@ export default function TestHandler(){
                 else if(systolic_number >= 140 || diastolic_number >= 90)
                     stage2Points = 2;
                 else;
-                let blood_pressure_risk = normalPoints + elevatedPoints + stage1Points + stage2Points;     
+                const blood_pressure_risk = normalPoints + elevatedPoints + stage1Points + stage2Points;     
 
                 setBloodPressureRisk(blood_pressure_risk);
                 eval_patient = {
@@ -219,9 +199,10 @@ export default function TestHandler(){
                     total_risk_score: 0
                 }
                 console.log("Evaluated Patient: ", eval_patient);
-                setEvaluatedPatients((prevItems) => [...(prevItems || []), eval_patient]);
+              
             } catch (error ) {
                 //console.error(`An error occurred:", ${(error as Error).message}`)
+                console.log(`Data Processing Error occurred: ${error}`)
                 setBpInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(patient)} `);
                 
                
@@ -247,7 +228,7 @@ export default function TestHandler(){
                     return patient?.patient_id === id;
                 })
                 if(checkAlready?.length === 0)
-                    setDataQualityIssues((prevItems) => [...prevItems || [], patient?.patient_id]);           
+                    setDataQualityIssues((prevItems) => [...prevItems || [], eval_patient?.patient_id]);           
             }
 
             // Evaluate for Temperature Risk
@@ -272,7 +253,6 @@ export default function TestHandler(){
                 let normalPoints = 0;
                 let lowFeverPoints = 0;
                 let highFeverPoints = 0;
-                let stage2Points = 0;
                 if(temperature_number <= 99.5)
                     normalPoints = 0;
                 else if(temperature_number >= 99 && temperature_number <= 100.9)
@@ -280,7 +260,7 @@ export default function TestHandler(){
                 else if(temperature_number >= 101.0)
                     highFeverPoints = 2;
                 else;
-                let temperature_risk = normalPoints + lowFeverPoints + highFeverPoints;     
+                const temperature_risk = normalPoints + lowFeverPoints + highFeverPoints;     
 
                 setTemperatureRisk(temperature_risk);
 
@@ -289,6 +269,8 @@ export default function TestHandler(){
                     temperature_risk: temperature_risk,
                 }
                 eval_patient = {...eval_patient, ...partialUpdate}
+
+              
 
                const non_evaluated = evaluatedPatients?.filter((patient) => {
                   return patient.patient_id !== eval_patient.patient_id;
@@ -308,7 +290,7 @@ export default function TestHandler(){
 
                const new_set = [...non_evaluated as EvalPatient[], eval_patient]
                console.log("New Set: ", new_set);
-               setEvaluatedPatients(new_set);
+              // setEvaluatedPatients(new_set);
             } catch (error ) {
                 //console.error(`An error occurred:", ${(error as Error).message}`)
                 setTpInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(patient)} `);
@@ -324,9 +306,6 @@ export default function TestHandler(){
                 });
                const new_set = [...non_evaluated as EvalPatient[], eval_patient]
                console.log("New Set: ", new_set);
-               setEvaluatedPatients(new_set);
-
-
                 // Record High Temperature Even in Error
                     const checkAlready = feverPatients?.filter((id) => {
                         return eval_patient.patient_id === id;
@@ -338,10 +317,10 @@ export default function TestHandler(){
 
 
                 // Record Data Quality Issues               
-                const checkAlreadyQ = dataQualityIssues?.filter((id) => {
+                const checkAlreadyT = dataQualityIssues?.filter((id) => {
                     return patient?.patient_id === id;
                 })
-                if(checkAlreadyQ?.length === 0)
+                if(checkAlreadyT?.length === 0)
                     setDataQualityIssues((prevItems) => [...prevItems || [], patient?.patient_id]);       
             }
 
@@ -365,7 +344,6 @@ export default function TestHandler(){
            
                 // Set State variables
                 const age_number = Number(age);
-                setAge(age_number);
 
                 let normalPoints = 0;
                 let lowRiskPoints = 0;
@@ -377,7 +355,7 @@ export default function TestHandler(){
                 else if(age_number > 65)
                     highRiskPoints = 2;
                 else;
-                let age_risk = normalPoints + lowRiskPoints + highRiskPoints;     
+                const age_risk = normalPoints + lowRiskPoints + highRiskPoints;     
 
                 setAgeRisk(age_risk);
 
@@ -405,7 +383,11 @@ export default function TestHandler(){
 
                const new_set = [...non_evaluated as EvalPatient[], eval_patient];
                console.log("New Set: ", new_set);
-               setEvaluatedPatients(new_set);
+
+               // Set Evaluated Patients
+               const enLength = evaluatedPatients?.length || 0;
+               if(patientNumber < totalPatients && (enLength <= patientNumber))
+                    setEvaluatedPatients((prevItems) => [...(prevItems || []), eval_patient]);
             } catch (error ) {
                 
                 setAgeInfoError(`An error occurred:", ${(error as Error).message} Patient: ${JSON.stringify(patient)} `);
@@ -426,7 +408,7 @@ export default function TestHandler(){
 
                const new_set = [...non_evaluated as EvalPatient[], eval_patient];
                console.log("New Set: ", new_set);
-               setEvaluatedPatients(new_set);
+              // setEvaluatedPatients(new_set);
 
                 // Record High Risk even in Error and no age risk
                 if(total_risk >= 4) {
@@ -438,14 +420,16 @@ export default function TestHandler(){
                 }
 
                 // Record Data Quality Issues               
-                const checkAlready = dataQualityIssues?.filter((id) => {
+                const checkAlreadyAg = dataQualityIssues?.filter((id) => {
                     return patient?.patient_id === id;
                 })
-                if(checkAlready?.length === 0)
+                if(checkAlreadyAg?.length === 0)
                     setDataQualityIssues((prevItems) => [...prevItems || [], patient?.patient_id]);           
             }
+            console.log("Evaluated Patients:", evaluatedPatients);
+            console.log("Data Quality Issues:",dataQualityIssues);
         }
-    },[patients, patientIndex])
+    },[patients, patientIndex, lastIndex, dataQualityIssues, evaluatedPatients, feverPatients, highRiskPatients, temperature,patientNumber,totalPatients])
 
  
    
@@ -457,16 +441,19 @@ export default function TestHandler(){
                 setBpInfoError('');
                 setTpInfoError('');
                 setAgeInfoError('');
-                console.log("Patient Number: ", patient_number);
+                //console.log("Patient Number: ", patient_number);
                 setPatientIndex(pIndex);
+                setLastIndex(pIndex - 1);
+                
                 if(pIndex*pageNumber === (pageLimit*pageNumber))
                 {
                     setPageNumber(pageNumber + 1);
-                    setLoading(false);
+                    setLoading(true);
+                    setApiSuccess(false);
                     setPatientIndex(0);
-                    console.log("loading is set to false",loading);
+                    //console.log("loading is set to false",loading);
                 }
-            },[patientIndex]);
+            },[patientIndex, pageLimit, pageNumber]);
 
     const handlePreviousPatient = () => {
         const pIndex = patientIndex as number % pageLimit;
@@ -481,6 +468,8 @@ export default function TestHandler(){
         if(patient_number === patients_lastPage)
         {          
             setPageNumber(pageNumber-1);
+            setApiSuccess(false);
+            setLoading(true);
             setPatientNumber(patient_number);
             
             setPatientIndex(9);
@@ -489,7 +478,8 @@ export default function TestHandler(){
     };
 
     const handleRetry = () => {
-         setApiSuccess(true); 
+;        setApiSuccess(false); 
+         callHandler('GET');        
     };
 
     const handleAnswerSubmit = () => {
@@ -541,14 +531,14 @@ export default function TestHandler(){
                     </div>
                 }
           
-                { !loading && apiSuccess &&
+                { loading && !apiSuccess &&
                     <div className="flex items-center justify-center">
                         <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
                     </div>
                 }
 
                 
-                { loading && apiSuccess &&
+                { !loading && apiSuccess &&
                     <div className="flex items-center justify-center">
                         { patientNumber > 1 &&
                             <button type="button" 
@@ -567,7 +557,7 @@ export default function TestHandler(){
                 }
                 
 
-                 {loading && apiSuccess &&
+                 {!loading && apiSuccess &&
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-2 p-3">
                         {
                             patients?.map((patient:Patient, index:number) => (
@@ -701,12 +691,12 @@ export default function TestHandler(){
                         }
                     </div>
                 }
-                { !apiSuccess &&
+                { dataError &&
                                     <div className="text-center bg-white border border-gray-500 p-3 rounded-md shadow-sm hover:bg-gray-100">
                                         <p className="font-normal text-left text-sm p-2 text-red-700 dark:text-red-400">{response.error}</p> 
                                          <button type="button" 
                                             className="flex items-center justify-center h-10  mt-2  text-white bg-red-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2" 
-                                            onClick={handleRetry}>Retry
+                                            onClick= {() => handleRetry()}>Retry
                                         </button>        
                                     </div>
 

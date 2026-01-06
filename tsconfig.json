@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "es6",
-    "lib": ["dom", "dom.iterable", "es6"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "es6"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,7 +23,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     }
   },
   "include": [
@@ -27,11 +33,16 @@
     "globals.d.tsx",
     "./globals.css",
     "**/*.ts",
-    "**/*.tsx",    
+    "**/*.tsx",
     "**/*.css",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts","app/show-patients/page.tsx"
+    "**/*.mts",
+    "app/show-patients/page.tsx",
+    "build/types/**/*.ts",
+    "build/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }
